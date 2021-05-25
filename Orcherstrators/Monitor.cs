@@ -105,7 +105,8 @@ namespace FitBot.Orchestrators
         [Deterministic]
         private static User VerifyUser(string phone, List<User> contacts)
         {
-            return contacts.Find(c => c.CallMeBotSettings.Phone.Equals(phone));
+            User user = contacts.Find(c => c.CallMeBotSettings.Phone.Equals(phone));
+            return user ?? throw new Exception($"No user with phone number {phone} found.");
         }
 
         [Deterministic]
