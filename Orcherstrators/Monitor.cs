@@ -7,6 +7,7 @@ using FitBot.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace FitBot.Orchestrators
 {
@@ -39,48 +40,65 @@ namespace FitBot.Orchestrators
                 log.LogWarning("{0} is not in the correct format.", dateString);
             }
 
-            // Send initial confirmation
-            await monitorContext.CallActivityAsync("SendConfirmationAlert", msg);
+            // Check if request is a dublicate
+            DublicateDto dublicateDto = new DublicateDto { InstanceId = monitorContext.InstanceId, Request = input };
+            bool dublicate = await monitorContext.CallActivityAsync<bool>("GetDublicate", dublicateDto);
 
-            if (!monitorContext.IsReplaying)
+            if (dublicate)
             {
-                log.LogInformation($"Instantiating monitor for {input.Id}. Expires: {endTime}.");
+                string reason = $"The request {JsonConvert.SerializeObject(input)} already exists.";
+                TerminateDto terminateDto = new TerminateDto { InstanceId = monitorContext.InstanceId, Reason = reason };
+                await monitorContext.CallActivityAsync("TerminateInstance", terminateDto);
             }
-
-            while (monitorContext.CurrentUtcDateTime < endTime)
+            else
             {
-                // Check the course availability
+
+                if (monitorContext.CurrentUtcDateTime < endTime)
+                {
+                    // Send initial confirmation
+                    await monitorContext.CallActivityAsync("SendConfirmationAlert", msg);
+                }
+
                 if (!monitorContext.IsReplaying)
                 {
-                    log.LogInformation($"Checking current course conditions for {input.Id} at {monitorContext.CurrentUtcDateTime}.");
+                    log.LogInformation($"Instantiating monitor for {input.Id}. Expires: {endTime}.");
                 }
 
-                bool isPlaceAvailable = await monitorContext.CallActivityAsync<bool>("GetIsPlaceAvailable", input.Id);
-
-                if (isPlaceAvailable)
+                while (monitorContext.CurrentUtcDateTime < endTime)
                 {
-                    // Place available
+                    // Check the course availability
                     if (!monitorContext.IsReplaying)
                     {
-                        log.LogInformation($"Detected place available for {course.Title}. Notifying {input.Phone}.");
+                        log.LogInformation($"Checking current course conditions for {input.Id} at {monitorContext.CurrentUtcDateTime}.");
                     }
 
-                    await monitorContext.CallActivityAsync("SendPlaceAvailableAlert", msg);
-                    break;
-                }
-                else
-                {
-                    // Wait for the next checkpoint
-                    int interval = await monitorContext.CallActivityAsync<int>("GetInterval", null);
-                    DateTime nextCheckpoint = monitorContext.CurrentUtcDateTime.AddMinutes(interval);
-                    if (!monitorContext.IsReplaying) { log.LogInformation($"Next check for {course.Title} at {nextCheckpoint}."); }
+                    bool isPlaceAvailable = await monitorContext.CallActivityAsync<bool>("GetIsPlaceAvailable", input.Id);
 
-                    await monitorContext.CreateTimer(nextCheckpoint, CancellationToken.None);
+                    if (isPlaceAvailable)
+                    {
+                        // Place available
+                        if (!monitorContext.IsReplaying)
+                        {
+                            log.LogInformation($"Detected place available for {course.Title}. Notifying {input.Phone}.");
+                        }
+
+                        await monitorContext.CallActivityAsync("SendPlaceAvailableAlert", msg);
+                        break;
+                    }
+                    else
+                    {
+                        // Wait for the next checkpoint
+                        int interval = await monitorContext.CallActivityAsync<int>("GetInterval", null);
+                        DateTime nextCheckpoint = monitorContext.CurrentUtcDateTime.AddMinutes(interval);
+                        if (!monitorContext.IsReplaying) { log.LogInformation($"Next check for {course.Title} at {nextCheckpoint}."); }
+
+                        await monitorContext.CreateTimer(nextCheckpoint, CancellationToken.None);
+                    }
+
                 }
 
+                log.LogInformation($"Monitor expiring.");
             }
-
-            log.LogInformation($"Monitor expiring.");
         }
 
         [Deterministic]
