@@ -16,6 +16,13 @@ namespace FitBot.Orchestrators
         [FunctionName("Monitor")]
         public static async Task Run([OrchestrationTrigger] IDurableOrchestrationContext monitorContext, ILogger log)
         {
+            RetryOptions retryOptions = new RetryOptions(
+                        firstRetryInterval: TimeSpan.FromMinutes(1),
+                        maxNumberOfAttempts: 10)
+            {
+                BackoffCoefficient = 2.0
+            };
+
             MonitorRequest input = monitorContext.GetInput<MonitorRequest>();
             if (!monitorContext.IsReplaying) { log.LogInformation($"Received monitor request. Course id: {input?.Id}. Phone: {input?.Phone}."); }
 
@@ -72,7 +79,7 @@ namespace FitBot.Orchestrators
                         log.LogInformation($"Checking current course conditions for {input.Id} at {monitorContext.CurrentUtcDateTime}.");
                     }
 
-                    bool isPlaceAvailable = await monitorContext.CallActivityAsync<bool>("GetIsPlaceAvailable", input.Id);
+                    bool isPlaceAvailable = await monitorContext.CallActivityWithRetryAsync<bool>("GetIsPlaceAvailable", retryOptions, input.Id);
 
                     if (isPlaceAvailable)
                     {
