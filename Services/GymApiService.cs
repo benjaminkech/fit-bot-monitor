@@ -28,7 +28,12 @@ namespace FitBot.Services
             {
                 throw new InvalidOperationException("The GYM_API environment variable was not set.");
             }
-            string callString = $"{api}/{id}";
+            string userid = Environment.GetEnvironmentVariable("GYM_USERID");
+            if (string.IsNullOrEmpty(api))
+            {
+                throw new InvalidOperationException("The GYM_USERID environment variable was not set.");
+            }
+            string callString = $"{api}/{id}/{userid}";
             HttpResponseMessage response = await _client.GetAsync(callString);
             CourseResponse content = await response.Content.ReadAsAsync<CourseResponse>();
 
