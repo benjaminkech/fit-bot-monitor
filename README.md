@@ -14,6 +14,7 @@ Create a file local.settings.json with the content below.
     "AzureWebJobsStorage": "Storage",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet",
     "GYM_API": "API",
+    "GYM_USERID": "USERID",
     "INTERVAL": "5",
     "USERS": "[{\"name\":\"name\",\"callMeBotSettings\":{\"phone\":\"phone\",\"apikey\":key,\"messenger\":\"Signal\"}}]"
   },
