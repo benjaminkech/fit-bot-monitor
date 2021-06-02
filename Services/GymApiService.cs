@@ -15,25 +15,21 @@ namespace FitBot.Services
         {
             _client = httpClient;
         }
-        public async Task<CourseCondition> GetCurrentConditionsAsync(string id)
+        public async Task<CourseCondition> GetCurrentConditionsAsync(string courseId, string userId)
         {
-            CourseResponse response = await GetCurrentCourseAsync(id);
-            return MapToCoursePlaceCondition(response.AvailablePlaces, response.Enrolment);
+            CourseResponse response = await GetCurrentCourseAsync(courseId, userId);
+            return MapToCoursePlaceCondition(response);
         }
 
-        public async Task<CourseResponse> GetCurrentCourseAsync(string id)
+        public async Task<CourseResponse> GetCurrentCourseAsync(string courseId, string userId)
         {
             string api = Environment.GetEnvironmentVariable("GYM_API");
             if (string.IsNullOrEmpty(api))
             {
                 throw new InvalidOperationException("The GYM_API environment variable was not set.");
             }
-            string userid = Environment.GetEnvironmentVariable("GYM_USERID");
-            if (string.IsNullOrEmpty(api))
-            {
-                throw new InvalidOperationException("The GYM_USERID environment variable was not set.");
-            }
-            string callString = $"{api}/{id}/{userid}";
+
+            string callString = $"{api}/{courseId}/{userId}";
             HttpResponseMessage response = await _client.GetAsync(callString);
             CourseResponse content = await response.Content.ReadAsAsync<CourseResponse>();
 
@@ -44,9 +40,9 @@ namespace FitBot.Services
                 : content.Description == string.Empty ? throw new ArgumentException("Could not find a course with this id") : content;
         }
 
-        private static CourseCondition MapToCoursePlaceCondition(int availablePlaces, bool enrolment)
+        private static CourseCondition MapToCoursePlaceCondition(CourseResponse response)
         {
-            return availablePlaces > 0 && enrolment ? CourseCondition.Available : CourseCondition.NotAvailable;
+            return !response.Booked && response.Enrolment ? CourseCondition.Available : CourseCondition.NotAvailable;
         }
 
         private static CourseResponse TrimContent(CourseResponse content)

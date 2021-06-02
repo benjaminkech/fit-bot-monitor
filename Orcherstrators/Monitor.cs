@@ -24,12 +24,18 @@ namespace FitBot.Orchestrators
             };
 
             MonitorRequest input = monitorContext.GetInput<MonitorRequest>();
-            if (!monitorContext.IsReplaying) { log.LogInformation($"Received monitor request. Course id: {input?.Id}. Phone: {input?.Phone}."); }
+            if (!monitorContext.IsReplaying) { log.LogInformation($"Received monitor request. Course id: {input?.CourseId}. User id: {input?.UserId}."); }
 
             VerifyRequest(input);
             List<User> users = await monitorContext.CallActivityAsync<List<User>>("GetUsers", null);
-            User user = VerifyUser(input.Phone, users);
-            Course course = await monitorContext.CallActivityAsync<Course>("GetCourse", input.Id);
+            User user = VerifyUser(input.UserId, users);
+
+            CourseRequestDto courseRequestDto = new CourseRequestDto
+            {
+                CourseId = input.CourseId,
+                UserId = user.UserId
+            };
+            Course course = await monitorContext.CallActivityAsync<Course>("GetCourse", courseRequestDto);
             VerifyCourse(course);
             string dateString, format;
             DateTime endTime = monitorContext.CurrentUtcDateTime.AddHours(6);
@@ -68,7 +74,7 @@ namespace FitBot.Orchestrators
 
                 if (!monitorContext.IsReplaying)
                 {
-                    log.LogInformation($"Instantiating monitor for {input.Id}. Expires: {endTime}.");
+                    log.LogInformation($"Instantiating monitor for {input.CourseId}. Expires: {endTime}.");
                 }
 
                 while (monitorContext.CurrentUtcDateTime < endTime)
@@ -76,17 +82,17 @@ namespace FitBot.Orchestrators
                     // Check the course availability
                     if (!monitorContext.IsReplaying)
                     {
-                        log.LogInformation($"Checking current course conditions for {input.Id} at {monitorContext.CurrentUtcDateTime}.");
+                        log.LogInformation($"Checking current course conditions for {input.CourseId} at {monitorContext.CurrentUtcDateTime}.");
                     }
 
-                    bool isPlaceAvailable = await monitorContext.CallActivityWithRetryAsync<bool>("GetIsPlaceAvailable", retryOptions, input.Id);
+                    bool isPlaceAvailable = await monitorContext.CallActivityWithRetryAsync<bool>("GetIsPlaceAvailable", retryOptions, courseRequestDto);
 
                     if (isPlaceAvailable)
                     {
                         // Place available
                         if (!monitorContext.IsReplaying)
                         {
-                            log.LogInformation($"Detected place available for {course.Title}. Notifying {input.Phone}.");
+                            log.LogInformation($"Detected place available for {course.Title}. Notifying {input.UserId}.");
                         }
 
                         await monitorContext.CallActivityAsync("SendPlaceAvailableAlert", msg);
@@ -116,22 +122,24 @@ namespace FitBot.Orchestrators
                 throw new ArgumentNullException(nameof(request), "An input object is required.");
             }
 
-            if (string.IsNullOrEmpty(request.Id))
+            if (string.IsNullOrEmpty(request.CourseId))
             {
-                throw new ArgumentNullException(nameof(request.Id), "A id input is required.");
+                throw new ArgumentNullException(nameof(request.CourseId), "A Course id input is required.");
             }
 
-            if (string.IsNullOrEmpty(request.Phone))
+            if (string.IsNullOrEmpty(request.UserId))
             {
-                throw new ArgumentNullException(nameof(request.Phone), "A phone number input is required.");
+                throw new ArgumentNullException(nameof(request.UserId), "A User id input is required.");
             }
         }
 
         [Deterministic]
-        private static User VerifyUser(string phone, List<User> contacts)
+        private static User VerifyUser(string userId, List<User> contacts)
         {
-            User user = contacts.Find(c => c.CallMeBotSettings.Phone.Equals(phone));
-            return user ?? throw new Exception($"No user with phone number {phone} found.");
+            User user = contacts.Find(c => c.UserId.Equals(userId));
+            return string.IsNullOrEmpty(userId)
+                ? throw new ArgumentNullException(nameof(userId), "A UserId is required.")
+                : user ?? throw new Exception($"No user with userId {userId} found.");
         }
 
         [Deterministic]

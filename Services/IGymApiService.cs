@@ -5,7 +5,7 @@ namespace FitBot.Services
 {
     public interface IGymApiService
     {
-        Task<CourseCondition> GetCurrentConditionsAsync(string id);
-        Task<CourseResponse> GetCurrentCourseAsync(string id);
+        Task<CourseCondition> GetCurrentConditionsAsync(string courseId, string userId);
+        Task<CourseResponse> GetCurrentCourseAsync(string courseId, string userId);
     }
 }

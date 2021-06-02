@@ -4,8 +4,8 @@ namespace FitBot.Models
 {
     public class MonitorRequest
     {
-        public string Id { get; set; }
-        public string Phone { get; set; }
+        public string CourseId { get; set; }
+        public string UserId { get; set; }
 
         public override bool Equals(Object obj)
         {
@@ -17,7 +17,7 @@ namespace FitBot.Models
             else
             {
                 MonitorRequest request = (MonitorRequest)obj;
-                return (Id == request.Id) && (Phone == request.Phone);
+                return (CourseId == request.CourseId) && (UserId == request.UserId);
             }
         }
 

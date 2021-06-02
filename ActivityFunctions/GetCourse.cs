@@ -16,9 +16,9 @@ namespace FitBot.ActivityFunctions
         }
 
         [FunctionName("GetCourse")]
-        public async Task<Course> Run([ActivityTrigger] string id)
+        public async Task<Course> Run([ActivityTrigger] CourseRequestDto requestDto)
         {
-            CourseResponse response = await _service.GetCurrentCourseAsync(id);
+            CourseResponse response = await _service.GetCurrentCourseAsync(requestDto.CourseId, requestDto.UserId);
             Course course = new Course
             {
                 Title = response.Title,
